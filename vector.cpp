@@ -46,12 +46,12 @@ int vector_push_back(Vector<T>* vector, T item) {
 
 // Access an element at a specific index
 template <typename T>
-T* vector_get(Vector<T>* vector, unsigned int index) {
+T vector_get(Vector<T>* vector, unsigned int index) {
     if (index >= vector->size) {
         printf("Index out of bounds\n");
         return nullptr; // Error
     }
-    return &vector->data[index];
+    return vector->data[index];
 }
 
 template <typename T>

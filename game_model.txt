@@ -1,1 +1,2 @@
-sizexy 80 100
+sizeyx 40 101
+time 120
