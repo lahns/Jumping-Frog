@@ -51,6 +51,7 @@ void read_game_model(game_model &game){
     char parameter[100];
     int x_size, y_size;
 	float time;
+	game.last_frame = clock();
     fptr = fopen("game_model.txt", "r");
     if(fscanf(fptr, "%s %d %d", parameter, &y_size, &x_size) == 3){
         if(strcmp(SIZE_PARAMETER, parameter) == 0){
@@ -200,8 +201,8 @@ int main_game_loop(game_model &game) {
 
     clock_t now = clock();
     double elapsed_time = (double)(now - game.last_frame) / CLOCKS_PER_SEC;
-	game.time = float(elapsed_time);
     if (elapsed_time >= FRAME_TIME) {
+		game.time -= FRAME_TIME;
         game.last_frame = now;
         game.frog.can_move = 1;
     }
