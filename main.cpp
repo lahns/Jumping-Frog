@@ -41,6 +41,9 @@ struct game_model{
 	float time;
 	frog frog;
 	clock_t last_frame;
+	win* playwin;
+	win* statwin;
+	int last_inp;
 };
 
 void read_game_model(game_model &game){
@@ -76,7 +79,9 @@ WINDOW* Start()
 	init_pair(MAIN_COLOR, COLOR_WHITE, COLOR_BLACK);
 	init_pair(STAT_COLOR, COLOR_BLUE, COLOR_BLACK);
 	noecho();
-	keypad(win, true);								// Switch off echoing, turn off cursor
+	nodelay(win, DELAY_ON);
+	keypad(win, true);	
+	cbreak();							// Switch off echoing, turn off cursor
 	curs_set(0);
 	return win;
 }
@@ -125,70 +130,86 @@ void print_large_string(win &window, Vector<char*> *art, int x, int y, int color
 		mvwprintw(window.window, y+i, x,"%s",vector_get(art, i));
 	}
 	wattroff(window.window, COLOR_PAIR(color));
-	wrefresh(window.window);
 }
 
-frog setup_frog(win &window){
+frog setup_frog(game_model &game){
 	frog frog;
-	frog.x = getmaxx(window.window)/2; //start in the middle 
-	frog.y = getmaxy(window.window)-4; //start at the bottom of the window
+	frog.x = getmaxx(game.playwin->window)/2; //start in the middle 
+	frog.y = getmaxy(game.playwin->window)-4; //start at the bottom of the window
 	vector_push_back(frog.art, (char*)" @.@ ");
 	vector_push_back(frog.art, (char*)"( - )");
 	vector_push_back(frog.art, (char*)"/   \\");
+	frog.can_move = 1;
 	return frog;
 }
 
-int handle_input(win &playwin, game_model &game){
-	frog* frog = &game.frog;
-	
-	if(frog->can_move == 1){
-		switch(getch()){
-		case KEY_UP:
-			if(frog->y > 1){
-				frog->y-=1;
-				frog->can_move = 0;
-			}
-			break;
-		case KEY_DOWN:
-			if(frog->y < getmaxy(playwin.window)-4){  // frog size minus border
-				frog->y+=1;
-				frog->can_move = 0;
-			}
-			break;
-		case KEY_RIGHT:
-			if(frog->x < getmaxx(playwin.window)-6) { // frog width minus border
-				frog->x+=1;
-				frog->can_move = 0;
-			}
-			
-			break;
-		case KEY_LEFT:
-			if(frog->x > 1){
-				frog->x-=1;
-				frog->can_move = 0;
-			}
-			
-			break;
-		case 'q':
-			return GAME_END_FLAG;
-	}
-	}
-	
+int handle_input(game_model &game) {
+    frog* frog = &game.frog;
+    game.last_inp = getch(); // Non-blocking input
 
-	return 1;
+    if (frog->can_move == 1) {
+        switch (game.last_inp) {
+            case ERR: // No input detected
+                return 1;
+            case KEY_UP:
+                if (frog->y > 1) {
+                    frog->y -= 1;
+                    frog->can_move = 0;
+                }
+                break;
+            case KEY_DOWN:
+                if (frog->y < getmaxy(game.playwin->window) - 4) {
+                    frog->y += 1;
+                    frog->can_move = 0;
+                }
+                break;
+            case KEY_RIGHT:
+                if (frog->x < getmaxx(game.playwin->window) - 6) {
+                    frog->x += 1;
+                    frog->can_move = 0;
+                }
+                break;
+            case KEY_LEFT:
+                if (frog->x > 1) {
+                    frog->x -= 1;
+                    frog->can_move = 0;
+                }
+                break;
+            case 'q': // Quit game
+                return GAME_END_FLAG;
+        }
+    }
+    return 1;
 }
 
-int main_game_loop(win &statwin,win &playwin, game_model &game){
-	CleanWin(&playwin, 1);
-	print_large_string(playwin, game.frog.art, game.frog.x, game.frog.y, FROG_COLOR);
-	clock_t now = clock();
-	if((double)(now - game.last_frame) / CLOCKS_PER_SEC > 0.2){
-		game.last_frame = now;
-		game.frog.can_move = 1;
-	}
-	return handle_input(playwin, game);
-	
+
+void show_timer(game_model &game){
+	CleanWin(game.statwin, 1);
+	mvwprintw(game.statwin->window,1,10, "Time: %.2f", game.time);
 }
+
+void refresh_both(game_model &game){
+	wrefresh(game.playwin->window);
+	wrefresh(game.statwin->window);
+}
+
+int main_game_loop(game_model &game) {
+    CleanWin(game.playwin, 1);
+    print_large_string(*game.playwin, game.frog.art, game.frog.x, game.frog.y, FROG_COLOR);
+    show_timer(game);
+
+    clock_t now = clock();
+    double elapsed_time = (double)(now - game.last_frame) / CLOCKS_PER_SEC;
+	game.time = float(elapsed_time);
+    if (elapsed_time >= FRAME_TIME) {
+        game.last_frame = now;
+        game.frog.can_move = 1;
+    }
+
+    refresh_both(game);
+    return handle_input(game); // Process input in every loop
+}
+
 
 int main()
 {
@@ -198,14 +219,13 @@ int main()
 	Welcome(main_window);
 	int mid_x = getmaxx(main_window)/2/2;
 	int mid_y = getmaxy(main_window)/2/2/2;
-	win* playwin = Init(main_window, game.window_y_size, game.window_x_size, mid_y, mid_x, MAIN_COLOR, 1, DELAY_ON);
-	win* statwin = Init(main_window, 3, game.window_x_size, game.window_y_size+mid_y, mid_x, STAT_COLOR, 1, DELAY_OFF);	
+	game.playwin = Init(main_window, game.window_y_size, game.window_x_size, mid_y, mid_x, MAIN_COLOR, 1, DELAY_OFF);
+	game.statwin = Init(main_window, 3, game.window_x_size, game.window_y_size+mid_y, mid_x, STAT_COLOR, 1, DELAY_OFF);	
 	wrefresh(main_window);
 	
-	game.frog = setup_frog(*playwin);
+	game.frog = setup_frog(game);
 
-	while(main_game_loop(*statwin, *playwin, game) != GAME_END_FLAG){
-
+	while(main_game_loop(game) != GAME_END_FLAG){
 	};
 
 	refresh();			/* Print it on to the real screen */
