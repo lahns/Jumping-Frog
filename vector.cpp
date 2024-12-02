@@ -49,7 +49,7 @@ template <typename T>
 T vector_get(Vector<T>* vector, unsigned int index) {
     if (index >= vector->size) {
         printf("Index out of bounds\n");
-        return nullptr; // Error
+        throw; // Error
     }
     return vector->data[index];
 }
