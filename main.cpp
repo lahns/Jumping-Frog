@@ -53,6 +53,7 @@ struct car
 	int y;
 	float move_time;
 	int type;
+	clock_t last_frame;
 };
 
 struct game_model
