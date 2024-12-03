@@ -5,7 +5,8 @@ I've used the following resouces in spite of writing this project:
 */
 
 #include <cstring>
-#include <ncurses/ncurses.h>
+#include <ctime>
+#include <ncurses.h>
 #include <cstdio>
 #include <time.h>
 #include "vector.cpp"
@@ -185,8 +186,8 @@ void create_car(int x, int y, game_model &game)
 	car.x = x;
 
 	int car_type = 1 + rand() % 2;
-
-	car.move_time = 5 + rand() % 30;
+	car.last_frame = clock();
+	car.move_time = (1.0 + rand() % 3) / 40;
 
 	switch (car_type)
 	{
@@ -286,8 +287,8 @@ void game_over(int ending, game_model game, WINDOW *win)
 	};
 
 	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(over_text) / 2), over_text);
-	
-	
+
+
 
 	refresh();
 }
@@ -324,7 +325,6 @@ void find_roads(game_model &game){
 void create_cars_for_roads(game_model &game){
 	for(int i = 0; i < vector_size(game.street_corners); i++){
 		create_car(1, vector_get(game.street_corners, i), game);
-		printw("autko");
 	}
 }
 
@@ -335,14 +335,14 @@ void game_board(game_model &game)
 	int max_x = getmaxx(game_win);
 	int start_dest[6] = {1, 2, 3, max_y - 2, max_y - 3, max_y - 4};
 
-	
+
 
 	for (int i = 0; i < max_y; i++)
 	{
 		if (i == 0 || i == max_y - 1)
 		{
 			for (int j = 0; j < max_x; j++)
-			{	
+			{
 				mvwaddch(game_win, i, j, '*');
 			}
 		}
@@ -370,6 +370,27 @@ car get_car(game_model &game,int i){
 	return vector_get(game.cars, i);
 }
 
+void check_cars_and_move(game_model &game){
+    int max_x = getmaxx(game.playwin->window);
+    for(int i = 0; i < vector_size(game.cars); i++){
+        clock_t now = clock();
+        car *curr_car = vector_get_pointer(game.cars, i);
+        double elapsed_time = (double)(now - curr_car->last_frame) / CLOCKS_PER_SEC;
+        printw("autko w cornery: %d x: %d",curr_car->y, curr_car->x);
+        if(elapsed_time >= curr_car->move_time){
+            if(curr_car->x+curr_car->art_size+1 <= max_x){
+                curr_car->x = curr_car->x+1;
+                curr_car->last_frame = now;
+            }
+            else{
+                curr_car->x = 1;
+            }
+
+        }
+    }
+
+}
+
 int main_game_loop(game_model &game)
 {
 	CleanWin(game.playwin, 0);
@@ -385,6 +406,8 @@ int main_game_loop(game_model &game)
 
 	clock_t now = clock();
 	double elapsed_time = (double)(now - game.last_frame) / CLOCKS_PER_SEC;
+	check_cars_and_move(game);
+	refresh_both(game);
 	if (elapsed_time >= FRAME_TIME)
 	{
 		game.time -= FRAME_TIME;
@@ -393,6 +416,7 @@ int main_game_loop(game_model &game)
 			game.ending = RAN_OUT_OF_TIME_ENDING;
 			return -1;
 		}
+
 		game.last_frame = now;
 		game.frog.can_move = 1;
 	}
@@ -422,6 +446,6 @@ int main()
 	game_over(game.ending, game, main_window);
 
 	refresh();	  /* Print it on to the real screen */
-	_sleep(3000); /* Wait for user input */
+	while(getch() == ERR); /* Wait for user input */
 	endwin();	  /* End curses mode		  */
 }

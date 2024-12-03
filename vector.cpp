@@ -54,6 +54,16 @@ T vector_get(Vector<T>* vector, unsigned int index) {
     return vector->data[index];
 }
 
+// Get a pointer to a element inside a vector
+template <typename T>
+T* vector_get_pointer(Vector<T>* vector, unsigned int index) {
+    if (index >= vector->size) {
+        printf("Index out of bounds\n");
+        throw; // Error
+    }
+    return &vector->data[index];
+}
+
 template <typename T>
 void vector_free(Vector<T>* vector) {
     if (vector != nullptr) {
