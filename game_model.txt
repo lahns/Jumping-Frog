@@ -1,2 +1,2 @@
-sizeyx 42 101
+sizeyx 59 101
 time 120

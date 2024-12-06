@@ -2,6 +2,7 @@
 I've used the following resouces in spite of writing this project:
 -Example demo game "Catch the ball" by professor Małafiejski
 -https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
+-https://learnopelgl.com/In-Practice/2D-Game/Collisions/Collision-detecion
 */
 
 #include <cstring>
@@ -17,7 +18,10 @@ I've used the following resouces in spite of writing this project:
 #define FROG_COLOR 1
 #define STAT_COLOR 2
 #define PLAIN_COLOR 3
-#define ROAD_COLOR 4
+#define CAR_COLOR_1 4
+#define CAR_COLOR_2 5
+#define CAR_COLOR_3 6
+#define BUSH_COLOR 7
 #define COLOR_GRAY 10
 #define DELAY_ON 1
 #define DELAY_OFF 0
@@ -27,6 +31,8 @@ I've used the following resouces in spite of writing this project:
 #define GOT_HIT_ENDING 2
 #define SMALL_CAR 1
 #define BIG_CAR 2
+#define ART_HEIGHT 3 // every car and frog is 3 units tall
+#define AUTHOR "Wojciech Uminski 203847"
 
 struct win
 {
@@ -35,7 +41,6 @@ struct win
 	int rows, cols;
 	int color;
 };
-
 struct frog
 {
 	int x;
@@ -48,12 +53,20 @@ struct frog
 struct car
 {
 	int art_size;
-	Vector<char *> *art = vector_init<char *>();
+	Vector<char *> *art;
+	;
 	int x;
 	int y;
 	float move_time;
 	int type;
 	clock_t last_frame;
+	int color;
+};
+
+struct point
+{
+	int x;
+	int y;
 };
 
 struct game_model
@@ -69,7 +82,17 @@ struct game_model
 	int ending;
 	Vector<car> *cars = vector_init<car>();
 	Vector<int> *street_corners = vector_init<int>();
+	Vector<point> *bush_corners = vector_init<point>();
+	int score = 0;
 };
+
+point create_point(int x, int y)
+{
+	point new_point;
+	new_point.x = x;
+	new_point.y = y;
+	return new_point;
+}
 
 void read_game_model(game_model &game)
 {
@@ -106,12 +129,15 @@ WINDOW *Start()
 		exit(EXIT_FAILURE);
 	}
 
-	start_color();// initialize colors
+	start_color(); // initialize colors
 	init_pair(FROG_COLOR, COLOR_GREEN, COLOR_BLACK);
 	init_pair(MAIN_COLOR, COLOR_WHITE, COLOR_BLACK);
-	init_pair(STAT_COLOR, COLOR_BLUE, COLOR_BLACK);
+	init_pair(STAT_COLOR, COLOR_CYAN, COLOR_BLACK);
 	init_pair(PLAIN_COLOR, COLOR_BLACK, COLOR_GREEN);
-	init_pair(ROAD_COLOR, COLOR_BLACK, COLOR_MAGENTA);
+	init_pair(CAR_COLOR_1, COLOR_BLACK, COLOR_MAGENTA);
+	init_pair(CAR_COLOR_2, COLOR_BLACK, COLOR_YELLOW);
+	init_pair(CAR_COLOR_3, COLOR_BLACK, COLOR_WHITE);
+	init_pair(BUSH_COLOR, COLOR_GRAY, COLOR_GREEN);
 	noecho();
 	nodelay(win, DELAY_ON);
 	keypad(win, true);
@@ -171,8 +197,8 @@ void print_large_string(win &window, Vector<char *> *art, int x, int y, int colo
 frog setup_frog(game_model &game)
 {
 	frog frog;
-	frog.x = getmaxx(game.playwin->window) / 2; // start in the middle
-	frog.y = getmaxy(game.playwin->window) - 4; // start at the bottom of the window
+	frog.x = getmaxx(game.playwin->window) / 2 - 1; // start in the middle
+	frog.y = getmaxy(game.playwin->window) - 4;		// start at the bottom of the window
 	vector_push_back(frog.art, (char *)" @.@ ");
 	vector_push_back(frog.art, (char *)"( - )");
 	vector_push_back(frog.art, (char *)"/   \\");
@@ -180,16 +206,32 @@ frog setup_frog(game_model &game)
 	return frog;
 }
 
-void create_car(int x, int y, game_model &game)
+void give_car_color(car &car)
 {
-	car car;
-	car.y = y;
-	car.x = x;
+	int color = (1 + rand() % 3);
+	switch (color)
+	{
+	case 1:
+		car.color = CAR_COLOR_1;
+		break;
+	case 2:
+		car.color = CAR_COLOR_2;
+		break;
+	case 3:
+		car.color = CAR_COLOR_3;
+		break;
+	};
+}
 
-	int car_type = 1 + rand() % 2;
-	car.last_frame = clock();
+void give_car_random_speed(car &car)
+{
 	car.move_time = (1.0 + rand() % 3) / 40;
+}
 
+void give_car_random_type(car &car)
+{
+	int car_type = 1 + rand() % 2;
+	car.art = vector_init<char *>();
 	switch (car_type)
 	{
 	case SMALL_CAR:
@@ -205,8 +247,71 @@ void create_car(int x, int y, game_model &game)
 		vector_push_back(car.art, (char *)"o---o---oo");
 		break;
 	};
+}
 
+void create_car(int x, int y, game_model &game)
+{
+	car car;
+	car.y = y;
+	car.x = x;
+
+	car.last_frame = clock();
+	give_car_random_speed(car);
+	give_car_random_type(car);
+	give_car_color(car);
 	vector_push_back(game.cars, car);
+}
+
+void regen_car(car *car_to_regen)
+{
+	car &new_car = *car_to_regen;
+	give_car_color(new_car);
+	give_car_random_speed(new_car);
+	vector_free<char *>(car_to_regen->art);
+	give_car_random_type(new_car);
+	printw("regen");
+}
+
+int check_car_collision(game_model &game)
+{
+	Vector<car> *cars = game.cars;
+	int car_count = vector_size(cars);
+	for (int i = 0; i < car_count; i++)
+	{
+		car curr_car = vector_get(cars, i);
+		short collision_x = game.frog.x + (game.frog.art_size - 1) >= curr_car.x &&
+							curr_car.x + (curr_car.art_size - 1) >= game.frog.x;
+		short collision_y = (game.frog.y + 2) >= curr_car.y &&
+							(curr_car.y) + 2 >= game.frog.y;
+
+		if (collision_x && collision_y)
+		{
+			game.ending = GOT_HIT_ENDING;
+			return -1; // -1  meaning the frog got hit
+		}
+	}
+
+	return 0;
+}
+
+int check_bush_collision(game_model &game, point frog_xy)
+{
+
+	int bush_count = vector_size(game.bush_corners);
+	for (int i = 0; i < bush_count; i++)
+	{
+		point curr_point = vector_get(game.bush_corners, i);
+		short collision_x = frog_xy.x + (game.frog.art_size - 1) >= curr_point.x - 2 && // -2, frog art x is in frogs left-upper corner
+							curr_point.x + 2 >= frog_xy.x;								// + 2, bushes always have width of 3 units
+		short collision_y = (frog_xy.y + 2) >= curr_point.y &&							//  2, bushes always have height of 3 units
+							curr_point.y + 2 >= frog_xy.y;
+
+		if (collision_x && collision_y)
+		{
+			return 0; // 0  meaning frog will collide with a bush
+		}
+	}
+	return 1;
 }
 
 int handle_input(game_model &game)
@@ -216,6 +321,9 @@ int handle_input(game_model &game)
 
 	if (frog->can_move == 1)
 	{
+		point next_pos;
+		next_pos.x = frog->x;
+		next_pos.y = frog->y;
 		switch (game.last_inp)
 		{
 		case ERR: // No input detected
@@ -223,47 +331,67 @@ int handle_input(game_model &game)
 		case KEY_UP:
 			if (frog->y > 2)
 			{
-				frog->y -= 1;
-				frog->can_move = 0;
+				next_pos.y -= 1;
+				if (check_bush_collision(game, next_pos))
+				{
+					frog->y -= 1;
+					frog->can_move = 0;
+				}
 			}
-			else{
+			else
+			{
+				game.score += 1;
 				game.frog = setup_frog(game); // reset frog if reached the end
 			}
 			break;
 		case KEY_DOWN:
 			if (frog->y < getmaxy(game.playwin->window) - 4)
 			{
-				frog->y += 1;
-				frog->can_move = 0;
+				next_pos.y += 1;
+				if (check_bush_collision(game, next_pos))
+				{
+					frog->y += 1;
+					frog->can_move = 0;
+				}
 			}
 			break;
 		case KEY_RIGHT:
 			if (frog->x < getmaxx(game.playwin->window) - 6)
 			{
-				frog->x += 1;
-				frog->can_move = 0;
+				next_pos.x += 1;
+				if (check_bush_collision(game, next_pos))
+				{
+					frog->x += 1;
+					frog->can_move = 0;
+				}
 			}
 			break;
 		case KEY_LEFT:
 			if (frog->x > 1)
 			{
-				frog->x -= 1;
-				frog->can_move = 0;
+				next_pos.x -= 1;
+				if (check_bush_collision(game, next_pos))
+				{
+					frog->x -= 1;
+					frog->can_move = 0;
+				}
 			}
 			break;
 		case 'q': // Quit game
 			return GAME_END_FLAG;
 		}
 	}
-
-
 	return 1;
 }
 
-void show_timer(game_model &game)
+void show_score_bar(game_model &game)
 {
+	WINDOW *statwin = game.statwin->window;
+	int max_x = getmaxx(statwin);
 	CleanWin(game.statwin, 1);
-	mvwprintw(game.statwin->window, 1, 10, "Time: %.2f", game.time);
+	mvwprintw(statwin, 1, 5, "Time: %.2f", game.time);
+	mvwprintw(statwin, 1, (max_x - strlen(AUTHOR)) / 2, AUTHOR);
+	mvwprintw(statwin, 1, max_x - 10, "Score: %d", game.score);
 }
 
 void refresh_both(game_model &game)
@@ -272,12 +400,12 @@ void refresh_both(game_model &game)
 	wrefresh(game.statwin->window);
 }
 
-void game_over(int ending, game_model game, WINDOW *win)
+void game_over(game_model game, WINDOW *win)
 {
 	wclear(win);
 	const char *over_text = "GAME OVER";
 
-	switch (ending)
+	switch (game.ending)
 	{
 	case RAN_OUT_OF_TIME_ENDING:
 		mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen("You ran out of time!") / 2), "You ran out of time!");
@@ -289,15 +417,13 @@ void game_over(int ending, game_model game, WINDOW *win)
 
 	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(over_text) / 2), over_text);
 
-
-
 	refresh();
 }
 
 void streets_and_plains(game_model &game)
 {
-	int  max_y = getmaxy(game.playwin->window);
-	int  max_x = getmaxx(game.playwin->window);
+	int max_y = getmaxy(game.playwin->window);
+	int max_x = getmaxx(game.playwin->window);
 	for (int i = max_y - 10; i > 3; i -= 9)
 	{
 		for (int j = 1; j < max_x - 1; j++)
@@ -314,17 +440,50 @@ void streets_and_plains(game_model &game)
 	}
 }
 
-void find_roads(game_model &game){
+void find_roads_and_bushes(game_model &game)
+{
 	int max_y = getmaxy(game.playwin->window);
-	for(int i = max_y-4; i>=5; i-=6){
-		vector_push_back(game.street_corners, i-3);
-		vector_push_back(game.street_corners, i-6);
-		i-=3;
+	int max_x = getmaxx(game.playwin->window);
+	for (int i = max_y - 4; i >= 5; i -= 6)
+	{
+		vector_push_back(game.street_corners, i - 3);
+		vector_push_back(game.street_corners, i - 6);
+		int bush_limit = 8;
+		for (int j = 1; j < max_x; j += 10)
+		{
+			if (bush_limit > 0 && i < max_y - 4)
+			{
+				if (rand() % 2)
+				{
+					vector_push_back(game.bush_corners, create_point(j, i));
+					bush_limit--;
+				}
+			}
+		}
+
+		i -= 3;
 	}
 }
 
-void create_cars_for_roads(game_model &game){
-	for(int i = 0; i < vector_size(game.street_corners); i++){
+void print_bushes(game_model &game)
+{
+	int bush_count = vector_size(game.bush_corners);
+	for (int i = 0; i < bush_count; i++)
+	{
+		point curr_bush = vector_get(game.bush_corners, i);
+		wattron(game.playwin->window, COLOR_PAIR(BUSH_COLOR));
+		for (int j = 0; j < 3; j++)
+		{
+			mvwprintw(game.playwin->window, curr_bush.y + j, curr_bush.x, "###");
+		}
+		wattroff(game.playwin->window, COLOR_PAIR(BUSH_COLOR));
+	}
+}
+
+void create_cars_for_roads(game_model &game)
+{
+	for (int i = 0; i < vector_size(game.street_corners); i++)
+	{
 		create_car(1, vector_get(game.street_corners, i), game);
 	}
 }
@@ -335,8 +494,6 @@ void game_board(game_model &game)
 	int max_y = getmaxy(game_win);
 	int max_x = getmaxx(game_win);
 	int start_dest[6] = {1, 2, 3, max_y - 2, max_y - 3, max_y - 4};
-
-
 
 	for (int i = 0; i < max_y; i++)
 	{
@@ -367,29 +524,37 @@ void game_board(game_model &game)
 	wattroff(game_win, COLOR_PAIR(PLAIN_COLOR));
 }
 
-car get_car(game_model &game,int i){
+car get_car(game_model &game, int i)
+{
 	return vector_get(game.cars, i);
 }
 
-void check_cars_and_move(game_model &game){
-    int max_x = getmaxx(game.playwin->window);
-    for(int i = 0; i < vector_size(game.cars); i++){
-        clock_t now = clock();
-        car *curr_car = vector_get_pointer(game.cars, i);
-        double elapsed_time = (double)(now - curr_car->last_frame) / CLOCKS_PER_SEC;
-        printw("autko w cornery: %d x: %d",curr_car->y, curr_car->x);
-        if(elapsed_time >= curr_car->move_time){
-            if(curr_car->x+curr_car->art_size+1 <= max_x){
-                curr_car->x = curr_car->x+1;
-                curr_car->last_frame = now;
-            }
-            else{
-                curr_car->x = 1;
-            }
-
-        }
-    }
-
+void check_cars_and_move(game_model &game)
+{
+	int max_x = getmaxx(game.playwin->window);
+	for (int i = 0; i < vector_size(game.cars); i++)
+	{
+		clock_t now = clock();
+		car *curr_car = vector_get_pointer(game.cars, i);
+		double elapsed_time = (double)(now - curr_car->last_frame) / CLOCKS_PER_SEC;
+		if (elapsed_time >= curr_car->move_time)
+		{
+			if (curr_car->x + curr_car->art_size + 1 <= max_x)
+			{
+				curr_car->x++;
+				curr_car->last_frame = now;
+			}
+			else
+			{
+				curr_car->x = 1;
+				short should_reroll = rand() % 2; // pseudorandom number in range [0,1]
+				if (should_reroll)
+				{
+					regen_car(curr_car);
+				}
+			}
+		}
+	}
 }
 
 int main_game_loop(game_model &game)
@@ -398,16 +563,18 @@ int main_game_loop(game_model &game)
 	game_board(game);
 	print_large_string(*game.playwin, game.frog.art, game.frog.x, game.frog.y, FROG_COLOR);
 
-	for(int i = 0; i < vector_size(game.cars); i++){
+	for (int i = 0; i < vector_size(game.cars); i++)
+	{
 		car car = get_car(game, i);
-		print_large_string(*game.playwin, car.art, car.x, car.y, MAIN_COLOR);
+		print_large_string(*game.playwin, car.art, car.x, car.y, car.color);
 	}
 
-	show_timer(game);
+	show_score_bar(game);
 
 	clock_t now = clock();
 	double elapsed_time = (double)(now - game.last_frame) / CLOCKS_PER_SEC;
 	check_cars_and_move(game);
+	print_bushes(game);
 	refresh_both(game);
 	if (elapsed_time >= FRAME_TIME)
 	{
@@ -423,14 +590,24 @@ int main_game_loop(game_model &game)
 	}
 
 	refresh_both(game);
-	return handle_input(game); // Process input in every loop
+
+	if (check_car_collision(game) == 0)
+	{
+		return handle_input(game);
+	}
+	else
+	{
+		return -1;
+	}
+
+	// Process input in every loop
 }
 
 int main()
 {
 	game_model game;
 	read_game_model(game);
-	srand(time(0));
+	srand((int)clock());
 	WINDOW *main_window = Start();
 	Welcome(main_window);
 	int mid_x = getmaxx(main_window) / 2 / 2;
@@ -439,14 +616,17 @@ int main()
 	wbkgd(game.playwin->window, COLOR_PAIR(MAIN_COLOR));
 	game.statwin = Init(main_window, 3, game.window_x_size, game.window_y_size + mid_y, mid_x, STAT_COLOR, 1, DELAY_OFF);
 	wrefresh(main_window);
-	find_roads(game);
+	find_roads_and_bushes(game);
 	create_cars_for_roads(game);
 	game.frog = setup_frog(game);
-	while (main_game_loop(game) != GAME_END_FLAG){};
+	while (main_game_loop(game) != GAME_END_FLAG)
+	{
+	};
 
-	game_over(game.ending, game, main_window);
+	game_over(game, main_window);
 
-	refresh();	  /* Print it on to the real screen */
-	while(getch() == ERR); /* Wait for user input */
-	endwin();	  /* End curses mode		  */
+	refresh(); /* Print it on to the real screen */
+	while (getch() == ERR)
+		;	  /* Wait for user input */
+	endwin(); /* End curses mode		  */
 }
