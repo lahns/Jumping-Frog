@@ -5,11 +5,13 @@ I've used the following resouces in spite of writing this project:
 -https://learnopelgl.com/In-Practice/2D-Game/Collisions/Collision-detecion
 */
 
+#include <cmath>
 #include <cstring>
 #include <ctime>
 #include <ncurses.h>
 #include <cstdio>
 #include <time.h>
+#include <math.h>
 #include "vector.cpp"
 
 #define SIZE_PARAMETER "sizeyx"
@@ -48,6 +50,9 @@ struct frog
 	Vector<char *> *art = vector_init<char *>();
 	int art_size = 3;
 	short can_move;
+	short is_near_f_car; // is near a friendly car 0 means no, 1 means yes
+	short is_on_car; // is frog travelling on a friendly car? 0 means no, 1 means yes
+	int car_to_bound; //friendly car index, that the frog can bound with
 };
 
 struct car
@@ -61,6 +66,9 @@ struct car
 	int type;
 	clock_t last_frame;
 	int color;
+	short can_collide; // 0 no, 1 yes
+	short is_friendly; // 0 no, 1 yes
+	short does_stop; // 0 no, 1 yes
 };
 
 struct point
@@ -92,6 +100,10 @@ point create_point(int x, int y)
 	new_point.x = x;
 	new_point.y = y;
 	return new_point;
+}
+
+double distance_of_two_points(point a, point b){
+    return sqrt(pow((b.x-a.x),2)+pow((b.y-a.y),2));
 }
 
 void read_game_model(game_model &game)
@@ -202,6 +214,8 @@ frog setup_frog(game_model &game)
 	vector_push_back(frog.art, (char *)" @.@ ");
 	vector_push_back(frog.art, (char *)"( - )");
 	vector_push_back(frog.art, (char *)"/   \\");
+	frog.is_near_f_car = 0;
+	frog.is_on_car = 0;
 	frog.can_move = 1;
 	return frog;
 }
@@ -237,16 +251,58 @@ void give_car_random_type(car &car)
 	case SMALL_CAR:
 		car.art_size = 5;
 		vector_push_back(car.art, (char *)"____ ");
+
+		if(car.does_stop){
+		vector_push_back(car.art, (char *)"| S \\");
+		}
+		else if (car.is_friendly) {
+		vector_push_back(car.art, (char *)"| F \\");
+		}
+		else{
 		vector_push_back(car.art, (char *)"|   \\");
+		}
+
 		vector_push_back(car.art, (char *)"o---o");
 		break;
 	case BIG_CAR:
 		car.art_size = 10;
 		vector_push_back(car.art, (char *)"_________ ");
+		if(car.does_stop){
+		vector_push_back(car.art, (char *)"|SSSS|   \\");
+		}
+		else if (car.is_friendly) {
+		vector_push_back(car.art, (char *)"|FFFF|   \\");
+		}
+		else{
 		vector_push_back(car.art, (char *)"|    |   \\");
+		}
 		vector_push_back(car.art, (char *)"o---o---oo");
 		break;
 	};
+}
+
+void roll_if_friendly(car &car){
+    int chance = rand() % 101; //0-90 not friendly 91-100 friendly
+    if(chance <91){
+        car.is_friendly = 0;
+        car.can_collide = 1;
+    }
+    else{
+        car.is_friendly = 1;
+        car.can_collide = 0;
+    }
+}
+
+void roll_if_stops(car &car){
+    int chance = rand() % 101; // 0-85 doesnt stop 86-100 stops
+    if(chance<86){
+        car.does_stop = 0;
+        car.can_collide = 1;
+    }
+    else{
+        car.does_stop = 1;
+        car.can_collide = 0;
+    }
 }
 
 void create_car(int x, int y, game_model &game)
@@ -256,6 +312,10 @@ void create_car(int x, int y, game_model &game)
 	car.x = x;
 
 	car.last_frame = clock();
+	roll_if_stops(car);
+	if(car.does_stop == 0){ // roll if friendly only if its not a stopping car
+	   roll_if_friendly(car);
+	}
 	give_car_random_speed(car);
 	give_car_random_type(car);
 	give_car_color(car);
@@ -265,6 +325,10 @@ void create_car(int x, int y, game_model &game)
 void regen_car(car *car_to_regen)
 {
 	car &new_car = *car_to_regen;
+	roll_if_stops(new_car);
+	if(new_car.does_stop == 0){ // roll if friendly only if its not a stopping car
+	   roll_if_friendly(new_car);
+	}
 	give_car_color(new_car);
 	give_car_random_speed(new_car);
 	vector_free<char *>(car_to_regen->art);
@@ -279,15 +343,17 @@ int check_car_collision(game_model &game)
 	for (int i = 0; i < car_count; i++)
 	{
 		car curr_car = vector_get(cars, i);
-		short collision_x = game.frog.x + (game.frog.art_size - 1) >= curr_car.x &&
-							curr_car.x + (curr_car.art_size - 1) >= game.frog.x;
-		short collision_y = (game.frog.y + 2) >= curr_car.y &&
-							(curr_car.y) + 2 >= game.frog.y;
+		if(curr_car.can_collide){
+    		short collision_x = game.frog.x + (game.frog.art_size - 1) >= curr_car.x &&
+    							curr_car.x + (curr_car.art_size - 1) >= game.frog.x;
+    		short collision_y = (game.frog.y + 2) >= curr_car.y &&
+    							(curr_car.y) + 2 >= game.frog.y;
 
-		if (collision_x && collision_y)
-		{
-			game.ending = GOT_HIT_ENDING;
-			return -1; // -1  meaning the frog got hit
+    		if (collision_x && collision_y)
+    		{
+    			game.ending = GOT_HIT_ENDING;
+    			return -1; // -1  meaning the frog got hit
+    		}
 		}
 	}
 
@@ -329,6 +395,7 @@ int handle_input(game_model &game)
 		case ERR: // No input detected
 			return 1;
 		case KEY_UP:
+		    frog->is_on_car = 0;
 			if (frog->y > 2)
 			{
 				next_pos.y -= 1;
@@ -345,6 +412,7 @@ int handle_input(game_model &game)
 			}
 			break;
 		case KEY_DOWN:
+            frog->is_on_car = 0;
 			if (frog->y < getmaxy(game.playwin->window) - 4)
 			{
 				next_pos.y += 1;
@@ -356,6 +424,7 @@ int handle_input(game_model &game)
 			}
 			break;
 		case KEY_RIGHT:
+		    frog->is_on_car = 0;
 			if (frog->x < getmaxx(game.playwin->window) - 6)
 			{
 				next_pos.x += 1;
@@ -367,6 +436,7 @@ int handle_input(game_model &game)
 			}
 			break;
 		case KEY_LEFT:
+		    frog->is_on_car = 0;
 			if (frog->x > 1)
 			{
 				next_pos.x -= 1;
@@ -377,6 +447,12 @@ int handle_input(game_model &game)
 				}
 			}
 			break;
+		case 'f':
+		if(frog->is_near_f_car){
+		    frog->is_on_car = 1;
+			frog->can_move = 0;
+		}
+		break;
 		case 'q': // Quit game
 			return GAME_END_FLAG;
 		}
@@ -531,6 +607,7 @@ car get_car(game_model &game, int i)
 
 void check_cars_and_move(game_model &game)
 {
+    frog &frog = game.frog;
 	int max_x = getmaxx(game.playwin->window);
 	for (int i = 0; i < vector_size(game.cars); i++)
 	{
@@ -541,11 +618,40 @@ void check_cars_and_move(game_model &game)
 		{
 			if (curr_car->x + curr_car->art_size + 1 <= max_x)
 			{
+			    if(curr_car->does_stop || curr_car->is_friendly){
+					point car_p = create_point(curr_car->x + curr_car->art_size/2, curr_car->y-1); //middle of the car
+					point frog_p = create_point(frog.x+1, frog.y-1); // middle of the frog
+					double dist = distance_of_two_points(car_p, frog_p);
+					if(curr_car->does_stop && dist >= 10 ){
+		                curr_car->x++;
+						curr_car->last_frame = now;
+					}
+					else if(curr_car->is_friendly){
+					   if(dist <= 10){
+							frog.is_near_f_car = 1;
+							frog.car_to_bound = i;
+							if(frog.is_on_car && frog.car_to_bound == i){
+							    frog.x = curr_car->x;
+								frog.y = curr_car->y;
+							}
+					   }
+					   else{
+							game.frog.is_near_f_car = 0;
+						}
+						curr_car->x++;
+						curr_car->last_frame = now;
+					}
+				}
+				else{
 				curr_car->x++;
 				curr_car->last_frame = now;
+				}
 			}
 			else
-			{
+			{   if(curr_car->is_friendly){
+			        frog.is_on_car = 0;
+					frog.is_near_f_car = 0;
+			    }
 				curr_car->x = 1;
 				short should_reroll = rand() % 2; // pseudorandom number in range [0,1]
 				if (should_reroll)
@@ -556,6 +662,7 @@ void check_cars_and_move(game_model &game)
 		}
 	}
 }
+
 
 int main_game_loop(game_model &game)
 {
@@ -603,6 +710,14 @@ int main_game_loop(game_model &game)
 	// Process input in every loop
 }
 
+void cleanup_game(game_model &game) {
+    vector_free<car>(game.cars);
+    vector_free<int>(game.street_corners);
+    vector_free<point>(game.bush_corners);
+    delwin(game.playwin->window);
+    delwin(game.statwin->window);
+}
+
 int main()
 {
 	game_model game;
@@ -626,7 +741,7 @@ int main()
 	game_over(game, main_window);
 
 	refresh(); /* Print it on to the real screen */
-	while (getch() == ERR)
-		;	  /* Wait for user input */
+	while (getch() == ERR); /* Wait for user input */
+	cleanup_game(game);
 	endwin(); /* End curses mode		  */
 }
