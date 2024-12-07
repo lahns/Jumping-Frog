@@ -283,25 +283,29 @@ void give_car_random_type(car &car)
 
 void roll_if_friendly(car &car){
     int chance = rand() % 101; //0-90 not friendly 91-100 friendly
-    if(chance <91){
+    if(chance <50){
         car.is_friendly = 0;
         car.can_collide = 1;
+        car.does_stop = 0;
     }
     else{
         car.is_friendly = 1;
         car.can_collide = 0;
+        car.does_stop = 0;
     }
 }
 
 void roll_if_stops(car &car){
     int chance = rand() % 101; // 0-85 doesnt stop 86-100 stops
-    if(chance<86){
+    if(chance<50){
         car.does_stop = 0;
         car.can_collide = 1;
+        car.is_friendly = 0;
     }
     else{
         car.does_stop = 1;
         car.can_collide = 0;
+        car.is_friendly = 0;
     }
 }
 
@@ -443,7 +447,6 @@ int handle_input(game_model &game)
 				if (check_bush_collision(game, next_pos))
 				{
 					frog->x -= 1;
-					frog->can_move = 0;
 				}
 			}
 			break;
