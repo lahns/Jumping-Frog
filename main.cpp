@@ -94,6 +94,7 @@ void read_game_model(game_model &game)
 	{
 		game.time = 60;
 	}
+	fclose(fptr);
 }
 
 void read_write_best_score(game_model &game, int new_score){
@@ -107,6 +108,7 @@ void read_write_best_score(game_model &game, int new_score){
         if(new_score >= game.best_score){
             game.best_score = new_score;
         }
+        fclose(fptr);
     }
     if(fptr != NULL){
         fptr = fopen("best_score.txt", "w");
@@ -116,6 +118,7 @@ void read_write_best_score(game_model &game, int new_score){
         else{
             fprintf(fptr, "%d", game.best_score);
         }
+        fclose(fptr);
     }
 }
 
