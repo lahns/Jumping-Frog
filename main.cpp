@@ -5,13 +5,10 @@ I've used the following resouces in spite of writing this project:
 -https://learnopelgl.com/In-Practice/2D-Game/Collisions/Collision-detecion
 */
 
-#include <cmath>
-#include <cstring>
-#include <ctime>
-#include <ncurses.h>
-#include <cstdio>
-#include <time.h>
 #include <math.h>
+#include <string.h>
+#include <ncurses.h>
+#include <time.h>
 #include "constants.h"
 #include "vector.h"
 #include "car.h"
