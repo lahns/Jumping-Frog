@@ -23,6 +23,11 @@
 #define ART_HEIGHT 3 // every car and frog is 3 units tall
 
 #define AUTHOR "Wojciech Uminski 203847"
-
+#define PRESS_TEXT "PRESS SPACEBAR TO CONTINUE"
+#define OVER_TEXT "GAME OVER"
+#define RAN_OF_TIME "You ran out of time!"
+#define GOT_HIT "You got ran over by a car :("
+#define WELCOME "Do you want to play a game?"
+#define TIP "Press any key to continue.."
 
 #endif

@@ -200,10 +200,8 @@ void refresh_both(game_model &game) //refreshes both game main windows
 void Welcome(WINDOW *win) // Welcome screen : press any key to continue
 {
 	init_pair(MAIN_COLOR, COLOR_WHITE, COLOR_BLACK);
-	const char *welcome_text = "Do you want to play a game?";
-	const char *tip_text = "Press any key to continue..";
-	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(welcome_text) / 2), welcome_text);
-	mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen(tip_text) / 2), tip_text);
+	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(WELCOME) / 2), WELCOME);
+	mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen(TIP) / 2), TIP);
 	while (wgetch(win) == ERR);
 	wclear(win); // clear (after next refresh)
 	wrefresh(win);
@@ -212,23 +210,23 @@ void Welcome(WINDOW *win) // Welcome screen : press any key to continue
 void game_over(game_model game, WINDOW *win) // End screen : press any key to continue
 {
 	wclear(win);
-	const char *over_text = "GAME OVER";
 	char score_text[1001];
 	sprintf(score_text, "Your final score: %d", game.score);
 	switch (game.ending)
 	{
 	case RAN_OUT_OF_TIME_ENDING:
-		mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen("You ran out of time!") / 2), "You ran out of time!");
+		mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen(RAN_OF_TIME) / 2), RAN_OF_TIME);
 		break;
 	case GOT_HIT_ENDING:
-		mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen("Got ran over by a car :(") / 2), "Got ran over by a car :(");
+		mvwaddstr(win, getmaxy(win) / 2 + 1, (getmaxx(win) / 2) - (strlen(GOT_HIT) / 2), GOT_HIT);
 		break;
 	};
 
-	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(over_text) / 2), over_text);
+	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(OVER_TEXT) / 2), OVER_TEXT);
 	mvwprintw(win, getmaxy(win) / 2 + 2, (getmaxx(win) / 2) - (strlen(score_text) / 2), score_text);
+	mvwprintw(win, getmaxy(win) / 2 + 3, (getmaxx(win) / 2) - (strlen(PRESS_TEXT) / 2), PRESS_TEXT);
+	while (getch() != ' '){};
 	refresh();
-	while (getch() == ERR){};
 }
 
 
