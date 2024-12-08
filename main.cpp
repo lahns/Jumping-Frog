@@ -8,7 +8,7 @@ I've used the following resouces in spite of writing this project:
 #include <cmath>
 #include <cstring>
 #include <ctime>
-#include <ncurses.h>
+#include <ncurses/ncurses.h>
 #include <cstdio>
 #include <time.h>
 #include <math.h>
@@ -29,8 +29,8 @@ struct frog
 {
 	int x;
 	int y;
-	Vector<char *> *art = vector_init<char *>();
-	int art_size = 3;
+	Vector<char *> *art;
+	int art_size = 3; // always 3
 	short can_move;
 	short is_near_f_car; // is near a friendly car 0 means no, 1 means yes
 	short is_on_car;	 // is frog travelling on a friendly car? 0 means no, 1 means yes
@@ -49,9 +49,9 @@ struct game_model
 	win *statwin;
 	int last_inp;
 	int ending;
-	Vector<car> *cars = vector_init<car>();
-	Vector<int> *street_corners = vector_init<int>();
-	Vector<point> *bush_corners = vector_init<point>();
+	Vector<car> *cars;
+	Vector<int> *street_corners;
+	Vector<point> *bush_corners;
 	int score = 0;
 };
 
@@ -61,6 +61,10 @@ FUNCTIONS THAT SETUP CRUCIAL OBJECTS
 
 void read_game_model(game_model &game)
 {
+	game.cars = vector_init<car>();
+	game.street_corners = vector_init<int>();
+	game.bush_corners = vector_init<point>();
+
 	FILE *fptr; // pointer to a file
 	char parameter[100];
 	int x_size, y_size;
@@ -96,6 +100,7 @@ void read_game_model(game_model &game)
 frog setup_frog(game_model &game)
 {
 	frog frog;
+	frog.art = vector_init<char *>();
 	frog.x = getmaxx(game.playwin->window) / 2 - 1; // start in the middle
 	frog.y = getmaxy(game.playwin->window) - 4;		// start at the bottom of the window
 	vector_push_back(frog.art, (char *)" @.@ ");
