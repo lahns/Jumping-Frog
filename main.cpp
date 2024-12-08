@@ -1,10 +1,11 @@
 /*
 I've used the following resouces in spite of writing this project:
--Example demo game "Catch the ball" by professor Małafiejski
+-Example demo game "Catch the ball" by professor Michal  Małafiejski
 -https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/
 -https://learnopelgl.com/In-Practice/2D-Game/Collisions/Collision-detecion
 */
 
+#include <cstdio>
 #include <math.h>
 #include <string.h>
 #include <ncurses.h>
@@ -50,6 +51,7 @@ struct game_model
 	Vector<int> *street_corners;
 	Vector<point> *bush_corners;
 	int score = 0;
+	int best_score;
 };
 
 /*
@@ -92,6 +94,29 @@ void read_game_model(game_model &game)
 	{
 		game.time = 60;
 	}
+}
+
+void read_write_best_score(game_model &game, int new_score){
+    FILE *fptr; // pointer to a file
+    if(fptr != NULL){
+        fptr = fopen("best_score.txt", "r");
+        int best_score;
+        if(fscanf(fptr, "%d", &best_score) == 1){
+            game.best_score = best_score;
+        }
+        if(new_score >= game.best_score){
+            game.best_score = new_score;
+        }
+    }
+    if(fptr != NULL){
+        fptr = fopen("best_score.txt", "w");
+        if(new_score >= game.best_score){
+            fprintf(fptr, "%d", new_score);
+        }
+        else{
+            fprintf(fptr, "%d", game.best_score);
+        }
+    }
 }
 
 frog setup_frog(game_model &game)
@@ -182,7 +207,7 @@ win *Init(WINDOW *parent, int rows, int cols, int y, int x, int color, int bo, i
 	return W;
 }
 
-void show_score_bar(game_model &game) 
+void show_score_bar(game_model &game)
 {
 	WINDOW *statwin = game.statwin->window;
 	int max_x = getmaxx(statwin);
@@ -212,8 +237,10 @@ void Welcome(WINDOW *win) // Welcome screen : press any key to continue
 void game_over(game_model game, WINDOW *win) // End screen : press any key to continue
 {
 	wclear(win);
-	char score_text[1001];
+	char score_text[100]; char best_score[100];
+	read_write_best_score(game, game.score);
 	sprintf(score_text, "Your final score: %d", game.score);
+	sprintf(best_score, "Your best score before: %d", game.best_score);
 	switch (game.ending)
 	{
 	case RAN_OUT_OF_TIME_ENDING:
@@ -226,7 +253,8 @@ void game_over(game_model game, WINDOW *win) // End screen : press any key to co
 
 	mvwaddstr(win, getmaxy(win) / 2, (getmaxx(win) / 2) - (strlen(OVER_TEXT) / 2), OVER_TEXT);
 	mvwprintw(win, getmaxy(win) / 2 + 2, (getmaxx(win) / 2) - (strlen(score_text) / 2), score_text);
-	mvwprintw(win, getmaxy(win) / 2 + 3, (getmaxx(win) / 2) - (strlen(PRESS_TEXT) / 2), PRESS_TEXT);
+	mvwprintw(win, getmaxy(win) / 2 + 3, (getmaxx(win) / 2) - (strlen(best_score) / 2), best_score);
+	mvwprintw(win, getmaxy(win) / 2 + 4, (getmaxx(win) / 2) - (strlen(PRESS_TEXT) / 2), PRESS_TEXT);
 	while (getch() != ' '){};
 	refresh();
 }
@@ -305,7 +333,7 @@ void find_roads_and_bushes(game_model &game) // find y's coordinates for roads a
 }
 
 /*
-FUNCTIONS FOR BASIC PRINTING 
+FUNCTIONS FOR BASIC PRINTING
 */
 
 void print_large_string(win &window, Vector<char *> *art, int x, int y, int color) //prints large string from char* vectors
@@ -656,7 +684,7 @@ int main()
 	};
 	game_over(game, main_window);
 	refresh();
-	
+
 	cleanup_game(game);
 	endwin();
 }
