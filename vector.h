@@ -1,3 +1,8 @@
+#ifndef VECTOR_H
+#define VECTOR_H
+
+//declarations inside this file, cause most of c++ implementations have problems with including template functions
+
 #include <cstdlib>
 #include <cstdio>
 
@@ -81,3 +86,6 @@ template <typename T>
 unsigned int vector_capacity(Vector<T>* vector) {
     return vector->capacity;
 }
+
+
+#endif

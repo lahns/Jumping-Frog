@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "ncurses.h": "c",
-        "cstdio": "cpp"
+        "cstdio": "cpp",
+        "ctime": "cpp",
+        "cmath": "cpp"
     }
 }
