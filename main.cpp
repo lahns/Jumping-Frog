@@ -8,7 +8,7 @@ I've used the following resouces in spite of writing this project:
 #include <cmath>
 #include <cstring>
 #include <ctime>
-#include <ncurses/ncurses.h>
+#include <ncurses.h>
 #include <cstdio>
 #include <time.h>
 #include <math.h>
